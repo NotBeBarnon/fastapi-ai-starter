@@ -16,6 +16,7 @@ uvicorn[standard]>=0.32.0
 websockets>=13.1
 anyio>=4.6.0
 orjson>=3.10.7
+python-multipart>=0.0.12
 
 # Pydantic v2 ----------------------
 pydantic>=2.9.0

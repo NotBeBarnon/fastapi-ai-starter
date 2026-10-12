@@ -1,5 +1,7 @@
 # FastAPI AI Starter
 
+**🌍 Read this in other languages**: [🇨🇳 简体中文](./README.md) · [🇺🇸 English](./README.en.md) · [🇯🇵 日本語](./README.ja.md) · [🇰🇷 한국어](./README.ko.md) · [🇪🇸 Español](./README.es.md)
+
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![FastAPI](https://img.shields.io/badge/fastapi-%E2%89%A50.115-green.svg)](https://fastapi.tiangolo.com/)
 [![Pydantic](https://img.shields.io/badge/pydantic-v2-orange.svg)](https://docs.pydantic.dev/)
@@ -38,6 +40,7 @@
 | 限流 + 安全中间件 | ✅ | ❌ | ✅ | ⚠️ |
 | Docker 多阶段 + CI/CD | ✅ | ❌ | ✅ | ⚠️ |
 | DB 不可用优雅降级 | ✅ | ❌ | ❌ | ❌ |
+| 内置管理后台（多语言） | ✅ | ❌ | ❌ | ❌ |
 
 **一句话差异**：别人给你一个 CRUD 架子，我们给你一个 **AI 应用直接能上生产** 的完整后端。
 
@@ -58,6 +61,9 @@
 | 👤 **用户体系** | PBKDF2-SHA256 密码哈希、注册/登录/改密、JWT Bearer 鉴权、admin/user 角色控制、DB 不可用优雅降级 | `POST /user/register`、`POST /user/login`、`GET /user/me`、`GET /user/list` |
 | 📦 **资源 CRUD** | 统一分页/过滤/排序规范、owner 权限隔离（越权 404 防枚举）、管理员全量查询、部分更新、DB 降级 | `GET/POST/PUT/DELETE /resource/beams`、`GET /resource/admin/beams` |
 | 🚀 **DevOps** | 多阶段 Dockerfile、docker-compose 一键编排（MySQL + Redis + 可选 Kafka）、GitHub Actions 自动回归 | `docker compose up -d` |
+| 📁 **文件/对象存储** | 存储后端抽象（本地磁盘零依赖默认 / S3 兼容可切换）、multipart 流式上传、大小上限与扩展名白名单、元数据落库、owner 权限隔离、公开直链下载、删除同步清理对象 | `POST /files/upload` |
+| ⚡ **WebSocket 实时通信** | 频道房间 + JWT 握手鉴权（query token）、群聊广播、在线人数/成员 presence、typing 指示、ping/pong 心跳、死连接自动剔除、服务端 HTTP 推送 | `WS /ws/rooms/{room}` |
+| 🖥️ **管理后台** | React 18 + Ant Design 5 + react-i18next，登录/Dashboard/用户/资源/知识库/文件/实时通信/监控 8 个模块，自带 5 国语言切换（中/英/日/韩/西） | `/admin/login` |
 
 所有端点自带 Swagger 文档（`/docs`），80 项单元测试全量覆盖，CI 每次 push 自动回归。
 
@@ -80,6 +86,7 @@ docker compose up -d
 | ❤️ 存活检查 | `http://localhost:8080/api/sample/monitor/healthz` |
 | ✅ 就绪探针（各组件状态） | `http://localhost:8080/api/sample/monitor/readyz` |
 | 📊 Prometheus 指标 | `http://localhost:8080/api/sample/monitor/metrics` |
+| 🖥️ **管理后台**（React Admin，5 国语言） | `http://localhost:8080/admin/login` |
 
 > 想加 Kafka？`docker compose --profile full up -d` 即可。
 >
@@ -132,6 +139,13 @@ python main.py run --reload   # 开发热重载
 ├── docker-compose.yml      # app + MySQL + Redis（--profile full 加 Kafka）
 ├── .github/workflows/      # GitHub Actions（ruff lint + 单元测试）
 ├── migrations/             # aerich 迁移文件
+└── admin/                  # React 18 + Ant Design 5 管理后台（Vite 构建，多语言 i18n）
+    ├── src/
+    │   ├── i18n.ts         # react-i18next 配置（5 国语言）
+    │   ├── locales/        # 语言包 zh-CN/en-US/ja-JP/ko-KR/es-ES
+    │   ├── pages/          # 6 个页面：Login/Dashboard/Users/Resources/Knowledge/Monitor
+    │   └── layouts/        # AdminLayout（顶栏+菜单+语言切换）
+    └── dist/               # 构建产物（FastAPI 静态托管，访问 /admin 即可）
 └── src/
     ├── application.py      # Typer 命令行入口
     ├── settings.py         # pydantic-settings 配置层（环境变量 > project_env > pyproject）
@@ -139,12 +153,14 @@ python main.py run --reload   # 开发热重载
     │   ├── apps.py         # FastAPI 实例 + 中间件挂载
     │   ├── events.py       # lifespan：Tortoise → Redis → Scheduler → LLM 网关
     │   ├── middlewares/    # 请求 ID + 访问日志中间件
-    │   └── routers/        # 路由（users / resource / mcp / sse / llm / rag / monitor / security）
+    │   └── routers/        # 路由（users / resource / files / ws / mcp / sse / llm / rag / monitor / security）
     └── my_tools/           # 独立工具库（可单独复用）
         ├── llm_tools/      # LLM 网关（多 provider 降级 / 重试 / 成本统计 / embeddings）
         ├── mcp_tools/      # MCP 协议（注册中心 / JSON-RPC Server / SSE+stdio 传输）
         ├── sse_tools/      # SSE 流式（SSEStream / LLMStreamer）
         ├── rag_tools/      # RAG（分块 / 伪向量降级 / 内存索引 / 检索问答编排）
+        ├── storage_tools/  # 对象存储（StorageBackend 抽象 / LocalStorage / S3Storage 模板）
+        ├── ws_tools/       # WebSocket（频道房间 ConnectionManager / presence / 广播）
         ├── observability/  # 可观测（健康探针 / Prometheus 指标 / 调用追踪）
         ├── security_tools/ # 安全（JWT / API Key / 滑动窗口限流）
         ├── redis_tools/    # redis.asyncio 客户端（单连接 / 哨兵，自动重连）
@@ -436,10 +452,10 @@ docker build -t [tag] -f ./docker/build_dockerfile .   # 打包编译产物为�
 - [x] 用户体系（注册/登录/JWT/角色）
 - [x] 资源 CRUD 模板（分页/权限隔离/管理员查询）
 - [x] RAG 知识库示例（向量检索 + LLM 问答）
-- [ ] 文件上传 / 对象存储模板
-- [ ] WebSocket 实时通信示例
+- [x] 管理后台（React 18 + Ant Design 5，自带 5 国语言）
+- [x] 文件上传 / 对象存储模板（本地磁盘 + S3 抽象，流式上传）
+- [x] WebSocket 实时通信示例（频道房间 + JWT 握手 + 在线状态 + 服务端推送）
 - [ ] Agent 编排模板（LangGraph 集成）
-- [ ] 管理后台（React Admin 开箱版）
 
 有想加的功能？欢迎提 [Issue](../../issues) 或 PR 🤝
 

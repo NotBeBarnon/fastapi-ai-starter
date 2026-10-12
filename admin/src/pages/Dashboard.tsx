@@ -9,11 +9,13 @@ import {
   WarningTwoTone,
   DatabaseOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import { llmApi, monitorApi, ragApi, userApi } from '../api'
 
 const { Title, Text } = Typography
 
 export default function Dashboard() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<{ total: number }>({ total: 0 })
   const [rag, setRag] = useState<{ total_docs: number; total_chunks: number; index_size: number; has_llm: boolean; fallback_embedding: boolean }>({
@@ -39,64 +41,65 @@ export default function Dashboard() {
     )
   }
 
-  const dbUp = readyz?.components?.find((c: any) => c.name === 'database')?.status === 'up'
-  const redisUp = readyz?.components?.find((c: any) => c.name === 'redis')?.status === 'up'
+  const dbUp = readyz?.data?.components?.find((c: any) => c.name === 'database')?.status === 'up'
+  const redisUp = readyz?.data?.components?.find((c: any) => c.name === 'redis')?.status === 'up'
 
   return (
     <div>
-      <Title level={4} style={{ marginTop: 0 }}>系统概览</Title>
+      <Title level={4} style={{ marginTop: 0 }}>{t('dashboard.title')}</Title>
+      <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>{t('dashboard.subtitle')}</Text>
       <Row gutter={16}>
         <Col xs={12} md={6}>
-          <Card><Statistic title="用户总数" value={users.total} prefix={<UserOutlined />} /></Card>
+          <Card><Statistic title={t('dashboard.userCount')} value={users.total} prefix={<UserOutlined />} /></Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card><Statistic title="知识库文档" value={rag.total_docs} prefix={<BookOutlined />} suffix={`/ ${rag.total_chunks} 分块`} /></Card>
+          <Card><Statistic title={t('dashboard.docCount')} value={rag.total_docs} prefix={<BookOutlined />} suffix={`/ ${rag.total_chunks} ${t('dashboard.chunks')}`} /></Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card><Statistic title="向量索引" value={rag.index_size} prefix={<DatabaseOutlined />} suffix="chunks" /></Card>
+          <Card><Statistic title={t('dashboard.indexSize')} value={rag.index_size} prefix={<DatabaseOutlined />} suffix={t('dashboard.chunks')} /></Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card><Statistic title="LLM 调用次数" value={llm?.call_count ?? 0} prefix={<ApiOutlined />} /></Card>
+          <Card><Statistic title={t('dashboard.llmCalls')} value={llm?.call_count ?? 0} prefix={<ApiOutlined />} suffix={t('dashboard.times')} /></Card>
         </Col>
       </Row>
 
       <Row gutter={16} style={{ marginTop: 16 }}>
         <Col xs={24} md={12}>
-          <Card title="组件状态">
+          <Card title={t('dashboard.systemStatus')}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <div>
-                <Text>数据库：</Text>
+                <Text>Database: </Text>
                 {dbUp ? <Tag icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} color="success">UP</Tag>
                      : <Tag icon={<WarningTwoTone twoToneColor="#ff4d4f" />} color="error">DOWN</Tag>}
               </div>
               <div>
-                <Text>Redis：</Text>
+                <Text>Redis: </Text>
                 {redisUp ? <Tag icon={<CheckCircleTwoTone twoToneColor="#52c41a" />} color="success">UP</Tag>
                         : <Tag icon={<WarningTwoTone twoToneColor="#ff4d4f" />} color="error">DOWN</Tag>}
               </div>
               <div>
-                <Text>LLM：</Text>
+                <Text>LLM: </Text>
                 {rag.has_llm ? (
                   <Tag color="success">{llm?.default_provider || 'default'} · {llm?.providers?.length || 0} providers</Tag>
                 ) : (
-                  <Tag color="warning">未配置（search 走伪向量降级）</Tag>
+                  <Tag color="warning">not configured</Tag>
                 )}
               </div>
               <div>
-                <Text>Embedding：</Text>
+                <Text>Embedding: </Text>
                 {rag.fallback_embedding
-                  ? <Tag color="warning">伪向量降级（未配置 embedding provider）</Tag>
-                  : <Tag color="success">真实向量</Tag>}
+                  ? <Tag color="warning">fallback (pseudo-vector)</Tag>
+                  : <Tag color="success">real vector</Tag>}
               </div>
             </Space>
           </Card>
         </Col>
         <Col xs={24} md={12}>
-          <Card title="快速信息">
-            <p><Text strong>版本：</Text> FastAPI AI Starter v2.0.0</p>
-            <p><Text strong>API 前缀：</Text> <Text code>/api/sample</Text></p>
-            <p><Text strong>Swagger：</Text> <a href="/api/sample/docs" target="_blank" rel="noreferrer">/api/sample/docs</a></p>
-            <p><Text strong>Admin 根路径：</Text> <Text code>/admin/</Text></p>
+          <Card title={t('dashboard.details')}>
+            <p><Text strong>FastAPI AI Starter v2.0.0</Text></p>
+            <p><Text strong>API: </Text><Text code>/api/sample</Text></p>
+            <p><Text strong>Swagger: </Text><a href="/api/sample/docs" target="_blank" rel="noreferrer">/api/sample/docs</a></p>
+            <p><Text strong>Admin: </Text><Text code>/admin/</Text></p>
           </Card>
         </Col>
       </Row>

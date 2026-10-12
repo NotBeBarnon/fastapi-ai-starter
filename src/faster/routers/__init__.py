@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ...settings import HTTP_BASE_URL
 from .admin import admin_router
+from .files.routers import files_router
 from .kafka import kafka_router
 from .llm import llm_router
 from .mcp import mcp_router
@@ -17,6 +18,7 @@ from .security import security_router
 from .sse import sse_router
 from .tasks import tasks_router
 from .users.routers import user_router
+from .ws.routers import ws_router
 
 __all__ = ("all_router",)
 
@@ -32,6 +34,8 @@ all_router.include_router(admin_router)
 all_router.include_router(security_router)
 all_router.include_router(kafka_router)
 all_router.include_router(tasks_router)
+all_router.include_router(files_router)
+all_router.include_router(ws_router)
 
 
 class FastAPIStatus(BaseModel):

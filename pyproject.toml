@@ -20,6 +20,8 @@ dependencies = [
     "websockets>=13.1",
     "anyio>=4.6.0",
     "orjson>=3.10.7",
+    # 文件上传（UploadFile / Form 解析必需）
+    "python-multipart>=0.0.12",
 
     # Pydantic v2
     "pydantic>=2.9.0",
@@ -118,6 +120,20 @@ replication_factor = 3
 fast_sample = "FAST_SAMPLE"
 [myproject.mq.topics.producer]
 fast_sample = "FAST_SAMPLE"
+
+# 对象存储（文件上传模板）
+# backend = "local" 走本地磁盘（零依赖，默认）；"s3" 走 S3 兼容存储（需 pip install aioboto3）
+[myproject.storage]
+backend = "local"
+namespace = "files"
+local_root = "uploads"
+max_size = 52428800
+# 扩展名白名单（含点、小写）；留空数组表示不限制
+allowed_extensions = []
+# 切换 S3 时填写（密钥建议走环境变量 FS_S3_ACCESS_KEY / FS_S3_SECRET_KEY，勿提交仓库）
+# s3_endpoint = "http://localhost:9000"
+# s3_bucket = "fastapi-ai-starter"
+# s3_region = "us-east-1"
 
 [myproject.security]
 auth_enabled = true

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Table, Tag, Button, Space, Modal, Form, Select, Switch, message, Popconfirm } from 'antd'
+import { Table, Tag, Button, Space, Modal, Form, Select, Switch, message } from 'antd'
 import type { TablePaginationConfig } from 'antd/es/table'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import { userApi, type AdminUser, type Paged } from '../api'
 
-// 后端 /user/list 暂不支持 role 更新，这里临时提供 UI 并直接返回"后端待补"提示，
-// 等后端补齐 /admin/users/{id} 之后即可完整工作。
 export default function UsersPage() {
+  const { t } = useTranslation()
   const [data, setData] = useState<Paged<AdminUser>>({ total: 0, page: 1, page_size: 10, items: [] })
   const [loading, setLoading] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -16,19 +16,10 @@ export default function UsersPage() {
   const load = async (page = 1, page_size = 10) => {
     setLoading(true)
     try {
-      // 优先用 /admin/users，回退 /user/list
-      try {
-        const r = await userApi.list({ page, page_size })
-        setData(r)
-      } catch {
-        const resp = await fetch(`/api/sample/user/list?page=${page}&page_size=${page_size}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('fast_admin_token')}` },
-        })
-        const r = await resp.json()
-        setData(r)
-      }
+      const r = await userApi.list({ page, page_size })
+      setData(r)
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || '加载失败')
+      message.error(e?.response?.data?.detail || t('common.failed'))
     } finally {
       setLoading(false)
     }
@@ -47,50 +38,49 @@ export default function UsersPage() {
     const values = await form.validateFields()
     try {
       await userApi.update(editing.id, values)
-      message.success('更新成功')
+      message.success(t('common.success'))
       setEditOpen(false)
       load(data.page, data.page_size)
     } catch (e: any) {
       const detail = e?.response?.data?.detail
-      if (detail && String(detail).includes('Not Found')) {
-        message.warning('后端接口 /admin/users/{id} 待补齐，已暂存前端状态')
-        setEditOpen(false)
-      } else {
-        message.error(detail || '更新失败')
-      }
+      message.error(detail || t('common.failed'))
     }
   }
 
   const columns = [
-    { title: 'ID', dataIndex: 'id', width: 60 },
-    { title: '用户名', dataIndex: 'username' },
+    { title: t('users.columns.id'), dataIndex: 'id', width: 80 },
+    { title: t('users.columns.username'), dataIndex: 'username' },
     {
-      title: '角色',
+      title: t('users.columns.role'),
       dataIndex: 'role',
-      width: 100,
+      width: 120,
       render: (r: string) => (
-        <Tag color={r === 'admin' ? 'blue' : 'default'}>{r}</Tag>
+        <Tag color={r === 'admin' ? 'blue' : 'default'}>
+          {r === 'admin' ? t('common.roleAdmin') : t('common.roleUser')}
+        </Tag>
       ),
     },
     {
-      title: '状态',
+      title: t('users.columns.status'),
       dataIndex: 'is_active',
-      width: 80,
-      render: (v: boolean) => v ? <Tag color="success">启用</Tag> : <Tag color="default">禁用</Tag>,
+      width: 100,
+      render: (v: boolean) => v
+        ? <Tag color="success">{t('common.enabled')}</Tag>
+        : <Tag color="default">{t('common.disabled')}</Tag>,
     },
     {
-      title: '注册时间',
+      title: t('users.columns.createdAt'),
       dataIndex: 'created_at',
       width: 180,
-      render: (t?: string) => t ? dayjs(t).format('YYYY-MM-DD HH:mm:ss') : '-',
+      render: (d?: string) => d ? dayjs(d).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '操作',
+      title: t('users.columns.actions'),
       key: 'op',
-      width: 140,
+      width: 120,
       render: (_: any, record: AdminUser) => (
         <Space>
-          <Button size="small" onClick={() => openEdit(record)}>编辑</Button>
+          <Button size="small" onClick={() => openEdit(record)}>{t('common.edit')}</Button>
         </Space>
       ),
     },
@@ -101,6 +91,7 @@ export default function UsersPage() {
     pageSize: data.page_size,
     total: data.total,
     showSizeChanger: true,
+    showTotal: (total) => t('common.total', { count: total }),
     onChange: (p, ps) => load(p, ps),
   }
 
@@ -114,18 +105,25 @@ export default function UsersPage() {
         pagination={pagination}
       />
       <Modal
-        title={`编辑用户：${editing?.username}`}
+        title={`${t('users.editUser')}：${editing?.username}`}
         open={editOpen}
         onOk={submitEdit}
         onCancel={() => setEditOpen(false)}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item label="角色" name="role" rules={[{ required: true }]}>
-            <Select options={[{ value: 'user', label: 'user' }, { value: 'admin', label: 'admin' }]} />
+          <Form.Item label={t('users.columns.role')} name="role" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: 'user', label: t('common.roleUser') },
+                { value: 'admin', label: t('common.roleAdmin') },
+              ]}
+            />
           </Form.Item>
-          <Form.Item label="是否启用" name="is_active" valuePropName="checked">
-            <Switch />
+          <Form.Item label={t('common.active')} name="is_active" valuePropName="checked">
+            <Switch checkedChildren={t('common.enabled')} unCheckedChildren={t('common.disabled')} />
           </Form.Item>
         </Form>
       </Modal>

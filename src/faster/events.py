@@ -10,7 +10,15 @@ from loguru import logger
 from tortoise import Tortoise
 
 from ..my_tools.redis_tools.clients import RedisClient, RedisSentinelClient
-from ..settings import AUTO_SCHEMA, DATABASE_CONFIG, MQ_CONFIG, RAG_CONFIG, REDIS_CONFIG
+from ..settings import (
+    AUTO_SCHEMA,
+    DATABASE_CONFIG,
+    MQ_CONFIG,
+    PROJECT_DIR,
+    RAG_CONFIG,
+    REDIS_CONFIG,
+    STORAGE_CONFIG,
+)
 
 __all__ = ("lifespan",)
 
@@ -154,6 +162,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning(f"RAG warm index skipped: {exc.__class__.__name__}: {exc}")
     app.state.rag = rag_service
 
+    # 6. 对象存储（默认本地磁盘 uploads/，可切 S3）+ WebSocket 连接管理器
+    from ..my_tools.storage_tools import init_storage
+    from ..my_tools.ws_tools import get_ws_manager
+
+    storage_manager = init_storage(STORAGE_CONFIG, PROJECT_DIR)
+    app.state.storage = storage_manager
+    app.state.storage_config = STORAGE_CONFIG
+    app.state.ws_manager = get_ws_manager()
+    logger.info(
+        f"Storage started: backend={storage_manager.backend_name}, "
+        f"max_size={STORAGE_CONFIG.get('max_size')} bytes"
+    )
+
     try:
         yield
     finally:
@@ -163,6 +184,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             kafka_producer.stop()
         if kafka_consumer is not None:
             kafka_consumer.stop()
+        await storage_manager.aclose()
         redis_client.stop()
         await Tortoise.close_connections()
         logger.info("Tortoise-ORM shutdown")

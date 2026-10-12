@@ -15,6 +15,7 @@ __all__ = (
     "check_redis",
     "check_kafka",
     "check_llm",
+    "check_storage",
     "build_app_health",
 )
 
@@ -171,6 +172,27 @@ async def check_llm(gateway: Any, *, deep: bool = False, timeout: float = 5.0) -
     return ComponentHealth("llm", STATUS_UP, latency, f"{len(report)} providers reachable", required=False)
 
 
+async def check_storage(storage_manager: Any, timeout: float = 3.0) -> ComponentHealth:
+    """对象存储后端健康状态（本地目录可写 / S3 bucket 可访问）。"""
+    if storage_manager is None:
+        return ComponentHealth("storage", STATUS_DISABLED, 0.0, "storage manager not mounted", required=False)
+    start = time.perf_counter()
+    try:
+        async with asyncio.timeout(timeout):
+            healthy = await storage_manager.health()
+        latency = (time.perf_counter() - start) * 1000
+        if healthy:
+            backend = getattr(storage_manager, "backend_name", "unknown")
+            return ComponentHealth("storage", STATUS_UP, latency, f"backend={backend} ok", required=False)
+        return ComponentHealth("storage", STATUS_DOWN, latency, "health check returned false", required=False)
+    except Exception as exc:
+        latency = (time.perf_counter() - start) * 1000
+        logger.warning(f"health: storage down - {exc.__class__.__name__}: {exc}")
+        return ComponentHealth(
+            "storage", STATUS_DOWN, latency, f"{exc.__class__.__name__}: {exc}", required=False
+        )
+
+
 def _aggregate(checks: list[ComponentHealth]) -> dict[str, Any]:
     """按 required 依赖聚合总体状态：up / degraded / down。"""
     any_required_down = any(c.status == STATUS_DOWN and c.required for c in checks)
@@ -208,5 +230,8 @@ async def build_app_health(
 
     llm_gateway = getattr(state, "llm", None)
     checks.append(await check_llm(llm_gateway, deep=deep_llm))
+
+    storage_manager = getattr(state, "storage", None)
+    checks.append(await check_storage(storage_manager, timeout=timeout))
 
     return _aggregate(checks)

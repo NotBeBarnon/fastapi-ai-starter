@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Spin } from 'antd'
+import { useTranslation } from 'react-i18next'
 import LoginPage from './pages/Login'
 import AdminLayout from './layouts/AdminLayout'
 import Dashboard from './pages/Dashboard'
@@ -8,6 +9,8 @@ import UsersPage from './pages/Users'
 import ResourcesPage from './pages/Resources'
 import KnowledgePage from './pages/Knowledge'
 import MonitorPage from './pages/Monitor'
+import FilesPage from './pages/Files'
+import RealtimePage from './pages/Realtime'
 import { authApi, getSavedUser, getToken, userApi, type AdminUser } from './api'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -20,6 +23,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 }
 
 function RequireAdmin({ children }: { children: JSX.Element }) {
+  const { t } = useTranslation()
   const [user, setUser] = useState<AdminUser | null>(getSavedUser())
   const [loading, setLoading] = useState(!getSavedUser())
 
@@ -57,7 +61,7 @@ function RequireAdmin({ children }: { children: JSX.Element }) {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Spin size="large" tip="加载中..." />
+        <Spin size="large" tip={t('common.loading')} />
       </div>
     )
   }
@@ -83,6 +87,8 @@ export default function App() {
         <Route path="users" element={<UsersPage />} />
         <Route path="resources" element={<ResourcesPage />} />
         <Route path="knowledge" element={<KnowledgePage />} />
+        <Route path="files" element={<FilesPage />} />
+        <Route path="realtime" element={<RealtimePage />} />
         <Route path="monitor" element={<MonitorPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

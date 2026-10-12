@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
+import i18n from './i18n'
 
 // 后端 API 基础路径（开发走 vite proxy，生产由 FastAPI 同域提供）
 export const API_BASE = '/api/sample'
@@ -86,7 +87,7 @@ export const authApi = {
       return { ...data, user: me }
     } catch {
       clearToken()
-      throw new Error('登录成功但获取用户信息失败')
+      throw new Error(i18n.t('http.serverError'))
     }
   },
   logout() {
@@ -188,16 +189,106 @@ export const llmApi = {
 }
 
 export const monitorApi = {
-  async readyz() {
-    const { data } = await http.get('/monitor/readyz')
-    return data
+  // readyz 在依赖（如 Redis/DB）异常时会返回 503，但 body 内仍包含组件状态明细，需要保留响应体
+  async readyz(): Promise<{ status: number; data: any }> {
+    const { status, data } = await http.get('/monitor/readyz', {
+      validateStatus: (s) => s >= 200 && s < 600,
+    })
+    return { status, data }
   },
-  async healthz() {
-    const { data } = await http.get('/monitor/healthz')
-    return data
+  async healthz(): Promise<{ status: number; data: any }> {
+    const { status, data } = await http.get('/monitor/healthz', {
+      validateStatus: (s) => s >= 200 && s < 600,
+    })
+    return { status, data }
   },
   async metrics(): Promise<string> {
-    const { data } = await http.get('/monitor/metrics', { responseType: 'text', transformResponse: [(d) => d] })
+    const { data } = await http.get('/monitor/metrics', {
+      responseType: 'text',
+      transformResponse: [(d) => (typeof d === 'string' ? d : JSON.stringify(d))],
+    })
+    return typeof data === 'string' ? data : JSON.stringify(data)
+  },
+}
+
+// ---------- 文件上传 / 对象存储 ----------
+export interface FileRecord {
+  id: number
+  filename: string
+  key: string
+  size: number
+  content_type: string
+  storage_backend: string
+  etag: string
+  is_public: boolean
+  owner_id: number
+  created_at: string
+  modified_at: string
+}
+
+export interface FileStatsInfo {
+  total_files: number
+  total_bytes: number
+  backend: string
+  storage_healthy: boolean
+}
+
+export const fileApi = {
+  async list(params: {
+    page?: number
+    page_size?: number
+    owner_id?: number
+    filename?: string
+  } = {}): Promise<Paged<FileRecord>> {
+    const { data } = await http.get('/files/admin/list', { params })
     return data
+  },
+  async upload(file: File, isPublic = false, onProgress?: (percent: number) => void): Promise<FileRecord> {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('is_public', String(isPublic))
+    const { data } = await http.post('/files/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => {
+        if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
+      },
+    })
+    return data
+  },
+  async remove(id: number) {
+    await http.delete(`/files/${id}`)
+  },
+  async stats(): Promise<FileStatsInfo> {
+    const { data } = await http.get('/files/stats')
+    return data
+  },
+  /** 带 token 的直链下载地址（用于 <a>/window.open） */
+  downloadUrl(id: number): string {
+    const token = getToken()
+    return `${API_BASE}/files/${id}/download?token=${encodeURIComponent(token || '')}`
+  },
+}
+
+// ---------- WebSocket 实时通信 ----------
+export interface WsStats {
+  connections: number
+  rooms: number
+  room_connections: Record<string, number>
+}
+
+export const wsApi = {
+  /** 构造房间 WebSocket 地址（token 走 query，浏览器 WS 无法自定义请求头） */
+  roomUrl(room: string): string {
+    const token = getToken() || ''
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+    return `${proto}://${location.host}${API_BASE}/ws/rooms/${encodeURIComponent(room)}?token=${encodeURIComponent(token)}`
+  },
+  async stats(): Promise<WsStats> {
+    const { data } = await http.get('/ws/stats')
+    return data
+  },
+  async broadcast(room: string, content: string, level = 'info') {
+    const { data } = await http.post('/ws/broadcast', { room, content, level })
+    return data as { room: string; delivered: number }
   },
 }

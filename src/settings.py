@@ -62,6 +62,22 @@ class MQConfig(BaseModel):
     topics: dict = Field(default_factory=dict)
 
 
+class StorageConfig(BaseModel):
+    """对象存储配置（默认本地磁盘；可切换 s3 兼容后端）。"""
+
+    backend: str = "local"  # local / s3
+    namespace: str = "files"
+    local_root: str = "uploads"  # 相对路径相对项目根目录
+    max_size: int = 50 * 1024 * 1024  # 单文件大小上限（字节），默认 50MB
+    allowed_extensions: list[str] = Field(default_factory=list)  # 扩展名白名单（含点，小写），空=不限
+    # S3 兼容配置（backend=s3 时生效；密钥建议走环境变量注入）
+    s3_endpoint: str = ""
+    s3_bucket: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_region: str = "us-east-1"
+
+
 class SecurityAPIKeyConfig(BaseModel):
     key: str
     role: str = "user"
@@ -119,6 +135,11 @@ class AppSettings(BaseSettings):
     FS_KAFKA_ENABLED: bool | None = None
     FS_AUTO_SCHEMA: bool | None = None
 
+    # 对象存储 S3 密钥（backend=s3 时通过环境变量注入，勿写入仓库）
+    FS_S3_ACCESS_KEY: str | None = None
+    FS_S3_SECRET_KEY: str | None = None
+    FS_STORAGE_BACKEND: str | None = None
+
 
 settings = AppSettings()
 
@@ -169,6 +190,16 @@ if settings.FS_KAFKA_SERVICE:
 if settings.FS_KAFKA_ENABLED is not None:
     _mq_cfg.enabled = settings.FS_KAFKA_ENABLED
 MQ_CONFIG = _mq_cfg.model_dump()
+
+# 对象存储配置（默认本地磁盘 uploads/；可切 S3）
+_storage_cfg = StorageConfig(**_PROJECT_CONFIG.get("storage", {}))
+if settings.FS_STORAGE_BACKEND:
+    _storage_cfg.backend = settings.FS_STORAGE_BACKEND
+if settings.FS_S3_ACCESS_KEY:
+    _storage_cfg.s3_access_key = settings.FS_S3_ACCESS_KEY
+if settings.FS_S3_SECRET_KEY:
+    _storage_cfg.s3_secret_key = settings.FS_S3_SECRET_KEY
+STORAGE_CONFIG = _storage_cfg.model_dump()
 
 # 安全配置（API Key / JWT / 限流）
 SECURITY_CONFIG: dict = SecurityConfig(**_PROJECT_CONFIG.get("security", {})).model_dump()
@@ -271,6 +302,10 @@ DATABASE_CONFIG: dict = {
         },
         "rag": {
             "models": ["src.faster.routers.rag.models"],
+            "default_connection": "default",
+        },
+        "files": {
+            "models": ["src.faster.routers.files.models"],
             "default_connection": "default",
         },
     },

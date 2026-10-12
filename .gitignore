@@ -1,6 +1,14 @@
 logs/
 build/
 code_test/
+# 本地文件上传目录（对象存储 local 后端，勿提交用户文件）
+uploads/
+# 本地预览/初始化脚本与 SQLite 预览库（开发辅助，勿提交）
+_preview.py
+_init_admin.py
+preview.db
+preview.db-shm
+preview.db-wal
 
 ### JetBrains
 .idea/
